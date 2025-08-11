@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Analytics - Threat Intelligence</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <style>
+        .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 2rem 0; }
+        .chart-container { background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 1rem; }
+        .chart-title { color: var(--text-primary); font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
+        .live-feed { max-height: 400px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); }
+        .attack-item { padding: 0.75rem; margin: 0.5rem 0; background: rgba(30, 41, 59, 0.6); border-left: 4px solid var(--accent-red); border-radius: 0.5rem; }
+        .attack-ip { color: var(--accent-cyan); font-family: monospace; font-weight: 600; }
+        .attack-time { color: var(--text-muted); font-size: 0.75rem; }
+        .threat-badge { padding: 0.25rem 0.5rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .threat-critical { background: var(--accent-red); color: white; }
+        .threat-high { background: var(--accent-orange); color: white; }
+        .threat-medium { background: #eab308; color: black; }
+        .threat-low { background: var(--accent-green); color: white; }
+    </style>
+</head>
+<body>
+    <header class="security-header">
+        <div class="header-content">
+            <a href="/" class="logo">ThreatNet</a>
+            <nav class="nav-menu">
+                <ul class="nav-links">
+                    <li><a href="/">🏠 Home</a></li>
+                    <li><a href="/admin">🛡️ Dashboard</a></li>
+                    <li><a href="/analytics.html" class="active">📊 Analytics</a></li>
+                </ul>
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    Live Monitoring
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <div class="admin-container">
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">📊 Threat Intelligence</h1>
+            <p class="dashboard-subtitle">Real-time security analytics and attack patterns</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalAttacks">127</div>
+                <div class="stat-label">Total Attacks Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="uniqueIPs">23</div>
+                <div class="stat-label">Unique Attackers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="blockedIPs">8</div>
+                <div class="stat-label">Blocked IPs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="threatLevel">Medium</div>
+                <div class="stat-label">Current Threat Level</div>
+            </div>
+        </div>
+
+        <div class="analytics-grid">
+            <div class="chart-container">
+                <h3 class="chart-title">📊 Attack Types Distribution</h3>
+                <canvas id="attackTypesChart" width="400" height="300"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3 class="chart-title">🕰️ Attacks Over Time</h3>
+                <canvas id="timelineChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+
+        <div class="analytics-grid">
+            <div class="chart-container">
+                <h3 class="chart-title">🌍 Top Attacking IPs</h3>
+                <canvas id="topIPsChart" width="400" height="300"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3 class="chart-title">⚠️ Threat Level Distribution</h3>
+                <canvas id="severityChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">🚨 Live Attack Feed</h3>
+            <div class="live-feed" id="liveFeed">
+                <div class="attack-item">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span class="attack-ip">192.168.1.100</span> - SQL Injection attempt
+                            <div class="attack-time">2 minutes ago</div>
+                        </div>
+                        <span class="threat-badge threat-high">HIGH</span>
+                    </div>
+                </div>
+                <div class="attack-item">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span class="attack-ip">10.0.0.50</span> - XSS attempt detected
+                            <div class="attack-time">5 minutes ago</div>
+                        </div>
+                        <span class="threat-badge threat-medium">MEDIUM</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button onclick="refreshData()" class="action-btn">🔄 Refresh Data</button>
+            <button onclick="exportReport()" class="action-btn">📊 Export Report</button>
+            <a href="/admin" class="action-btn">🛡️ Dashboard</a>
+            <a href="/" class="action-btn">🏠 Home</a>
+        </div>
+    </div>
+
+    <footer class="security-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>🛡️ ThreatNet</h4>
+                <p>Advanced honeypot security system for real-time threat detection and analysis.</p>
+            </div>
+            <div class="footer-section">
+                <h4>🔗 Quick Links</h4>
+                <ul class="footer-links">
+                    <li><a href="/">🏠 Home</a></li>
+                    <li><a href="/admin">🛡️ Dashboard</a></li>
+                    <li><a href="/analytics.html">📊 Analytics</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>📊 Security Stats</h4>
+                <p>• Multi-vector attack detection<br>
+                • Real-time threat monitoring<br>
+                • Advanced analytics & reporting</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 ThreatNet. Built for cybersecurity professionals.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Simple chart initialization without complex effects
+        const attackTypesCtx = document.getElementById('attackTypesChart').getContext('2d');
+        const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+        const topIPsCtx = document.getElementById('topIPsChart').getContext('2d');
+        const severityCtx = document.getElementById('severityChart').getContext('2d');
+
+        let attackTypesChart, timelineChart, topIPsChart, severityChart;
+
+        function initCharts() {
+            // Simple pie chart
+            attackTypesChart = new Chart(attackTypesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['SQL Injection', 'XSS', 'Command Injection', 'Path Traversal', 'Bot/Scanner'],
+                    datasets: [{
+                        data: [30, 20, 15, 10, 25],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#3b82f6', '#6b7280']
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    animation: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#cbd5e1' }
+                        }
+                    }
+                }
+            });
+
+            // Simple line chart
+            timelineChart = new Chart(timelineCtx, {
+                type: 'line',
+                data: {
+                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                    datasets: [{
+                        label: 'Attacks',
+                        data: [5, 12, 8, 25, 18, 30],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        fill: true
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    animation: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#cbd5e1' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#cbd5e1' },
+                            grid: { color: '#334155' }
+                        },
+                        y: {
+                            ticks: { color: '#cbd5e1' },
+                            grid: { color: '#334155' }
+                        }
+                    }
+                }
+            });
+
+            // Simple bar chart
+            topIPsChart = new Chart(topIPsCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['192.168.1.100', '10.0.0.50', '172.16.0.25', '203.0.113.10'],
+                    datasets: [{
+                        label: 'Attempts',
+                        data: [45, 32, 28, 15],
+                        backgroundColor: '#3b82f6'
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    animation: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            labels: { color: '#cbd5e1' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#cbd5e1' },
+                            grid: { color: '#334155' }
+                        },
+                        y: {
+                            ticks: { color: '#cbd5e1' },
+                            grid: { color: '#334155' }
+                        }
+                    }
+                }
+            });
+
+            // Simple severity chart
+            severityChart = new Chart(severityCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Critical', 'High', 'Medium', 'Low'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [8, 25, 35, 12],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#eab308', '#10b981']
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    animation: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#cbd5e1' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#cbd5e1' },
+                            grid: { color: '#334155' }
+                        },
+                        y: {
+                            ticks: { color: '#cbd5e1' },
+                            grid: { color: '#334155' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function refreshData() {
+            // Simple data updates without complex animations
+            document.getElementById('totalAttacks').textContent = Math.floor(Math.random() * 200) + 50;
+            document.getElementById('uniqueIPs').textContent = Math.floor(Math.random() * 50) + 10;
+            document.getElementById('blockedIPs').textContent = Math.floor(Math.random() * 20) + 5;
+            
+            const threatLevels = ['Low', 'Medium', 'High', 'Critical'];
+            document.getElementById('threatLevel').textContent = threatLevels[Math.floor(Math.random() * threatLevels.length)];
+        }
+
+        function exportReport() {
+            const reportData = {
+                timestamp: new Date().toISOString(),
+                totalAttacks: document.getElementById('totalAttacks').textContent,
+                uniqueIPs: document.getElementById('uniqueIPs').textContent,
+                charts: 'Chart data exported'
+            };
+            
+            const blob = new Blob([JSON.stringify(reportData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `honeypot-report-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        // Initialize charts when page loads
+        window.onload = function() {
+            initCharts();
+        };
+    </script>
+</body>
+</html>
