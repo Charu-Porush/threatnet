@@ -6,13 +6,10 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
-const net = require('net');
-const { spawn } = require('child_process');
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SSH_PORT = 2222;
-const FTP_PORT = 2121;
 
 // Security configuration
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'threatnet-admin-2024';
@@ -120,10 +117,10 @@ function analyzeSocialEngineering(username, password, userAgent, service) {
         trust: ['security', 'support', 'help', 'service', 'team']
     };
     
-    // Service-specific analysis
-    if (service === 'ssh' && username === 'root') {
-        score += 3;
-        indicators.push('Root SSH access attempt');
+    // HTTP-specific analysis
+    if (service === 'http' && username.toLowerCase().includes('admin')) {
+        score += 2;
+        indicators.push('Admin account targeting');
     }
     
     // Common credentials check
@@ -257,65 +254,7 @@ app.post('/login', loginLimiter, async (req, res) => {
     res.send(generateResponse(analysis));
 });
 
-// SSH Honeypot
-const sshServer = net.createServer((socket) => {
-    const ip = socket.remoteAddress;
-    console.log(`🔌 SSH connection from ${ip}`);
-    
-    socket.write('SSH-2.0-OpenSSH_8.0\r\n');
-    
-    let buffer = '';
-    socket.on('data', async (data) => {
-        buffer += data.toString();
-        
-        if (buffer.includes('ssh-userauth')) {
-            // Extract credentials (simplified)
-            const analysis = analyzeSocialEngineering('unknown', 'unknown', '', 'ssh');
-            await logAttack('ssh', ip, buffer, '', analysis);
-            
-            socket.write('Authentication failed\r\n');
-            socket.end();
-        }
-    });
-    
-    socket.on('error', () => {});
-    socket.setTimeout(30000, () => socket.destroy());
-});
 
-sshServer.listen(SSH_PORT, () => {
-    console.log(`🔐 SSH Honeypot listening on port ${SSH_PORT}`);
-});
-
-// FTP Honeypot
-const ftpServer = net.createServer((socket) => {
-    const ip = socket.remoteAddress;
-    console.log(`📁 FTP connection from ${ip}`);
-    
-    socket.write('220 Welcome to FTP Server\r\n');
-    
-    socket.on('data', async (data) => {
-        const command = data.toString().trim();
-        
-        if (command.startsWith('USER ')) {
-            const username = command.substring(5);
-            socket.write('331 Password required\r\n');
-        } else if (command.startsWith('PASS ')) {
-            const password = command.substring(5);
-            const analysis = analyzeSocialEngineering('ftp_user', password, '', 'ftp');
-            await logAttack('ftp', ip, command, '', analysis);
-            
-            socket.write('530 Authentication failed\r\n');
-            socket.end();
-        }
-    });
-    
-    socket.on('error', () => {});
-    socket.setTimeout(30000, () => socket.destroy());
-});
-
-ftpServer.listen(FTP_PORT, () => {
-    console.log(`📁 FTP Honeypot listening on port ${FTP_PORT}`);
-});
 
 // Secure Admin Routes
 app.get(`${ADMIN_PATH}/login`, (req, res) => {
@@ -364,6 +303,39 @@ app.get(`${ADMIN_PATH}/threat-intel`, requireAuth, (req, res) => {
         LIMIT 50`, [], (err, intel) => {
         
         res.send(generateThreatIntelDashboard(intel));
+    });
+});
+
+// Secure Analytics Route with Real Data
+app.get(`${ADMIN_PATH}/analytics`, requireAuth, (req, res) => {
+    res.send(generateSecureAnalytics());
+});
+
+// Analytics API endpoint for real-time updates
+app.get(`${ADMIN_PATH}/api/analytics-data`, requireAuth, (req, res) => {
+    db.all(`SELECT * FROM logs ORDER BY timestamp DESC LIMIT 100`, [], (err, logs) => {
+        if (err) return res.status(500).json({error: 'Database error'});
+        
+        const stats = {
+            totalAttacks: logs.length,
+            uniqueIPs: [...new Set(logs.map(l => l.ip))].length,
+            attackTypes: {},
+            threatLevels: {},
+            hourlyData: {},
+            topIPs: {},
+            recentAttacks: logs.slice(0, 10)
+        };
+        
+        logs.forEach(log => {
+            stats.attackTypes[log.attack_type] = (stats.attackTypes[log.attack_type] || 0) + 1;
+            stats.threatLevels[log.threat_level] = (stats.threatLevels[log.threat_level] || 0) + 1;
+            stats.topIPs[log.ip] = (stats.topIPs[log.ip] || 0) + 1;
+            
+            const hour = new Date(log.timestamp).getHours();
+            stats.hourlyData[hour] = (stats.hourlyData[hour] || 0) + 1;
+        });
+        
+        res.json(stats);
     });
 });
 
@@ -464,8 +436,8 @@ function generateEnterpriseDashboard(logs, stats) {
                         <div class="stat-label">Total Attacks</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">${services}</div>
-                        <div class="stat-label">Active Services</div>
+                        <div class="stat-number">HTTP</div>
+                        <div class="stat-label">Service Type</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number">${uniqueIPs}</div>
@@ -522,6 +494,7 @@ function generateEnterpriseDashboard(logs, stats) {
                 </div>
                 
                 <div class="action-buttons">
+                    <a href="${ADMIN_PATH}/analytics" class="action-btn">📊 Analytics</a>
                     <a href="${ADMIN_PATH}/threat-intel" class="action-btn">🌐 Threat Intelligence</a>
                     <button onclick="location.reload()" class="action-btn">🔄 Refresh</button>
                     <form method="POST" action="${ADMIN_PATH}/logout" style="display: inline;">
@@ -574,6 +547,7 @@ function generateThreatIntelDashboard(intel) {
                 </div>
                 
                 <div class="action-buttons">
+                    <a href="${ADMIN_PATH}/analytics" class="action-btn">📊 Analytics</a>
                     <a href="${ADMIN_PATH}/dashboard" class="action-btn">🛡️ Dashboard</a>
                     <button onclick="location.reload()" class="action-btn">🔄 Refresh</button>
                 </div>
@@ -582,7 +556,242 @@ function generateThreatIntelDashboard(intel) {
     `;
 }
 
+function generateSecureAnalytics() {
+    return `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>ThreatNet Analytics - Secure Console</title>
+            <link rel="stylesheet" href="/style.css">
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+                .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 2rem 0; }
+                .chart-container { background: rgba(30, 41, 59, 0.8); border: 1px solid #334155; padding: 1.5rem; border-radius: 1rem; }
+                .chart-title { color: #f1f5f9; font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
+                .live-feed { max-height: 400px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 0.5rem; border: 1px solid #334155; }
+                .attack-item { padding: 0.75rem; margin: 0.5rem 0; background: rgba(30, 41, 59, 0.6); border-left: 4px solid #ef4444; border-radius: 0.5rem; }
+                .attack-ip { color: #06b6d4; font-family: monospace; font-weight: 600; }
+                .threat-badge { padding: 0.25rem 0.5rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+                .threat-critical { background: #dc2626; color: white; }
+                .threat-high { background: #ea580c; color: white; }
+                .threat-medium { background: #eab308; color: black; }
+                .threat-low { background: #059669; color: white; }
+            </style>
+        </head>
+        <body>
+            <div class="admin-container">
+                <div class="dashboard-header">
+                    <h1>📊 ThreatNet Analytics Console</h1>
+                    <p>Real-time threat intelligence and attack visualization</p>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalAttacks">Loading...</div>
+                        <div class="stat-label">Total Attacks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="uniqueIPs">Loading...</div>
+                        <div class="stat-label">Unique Attackers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="criticalThreats">Loading...</div>
+                        <div class="stat-label">Critical Threats</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="currentThreat">Loading...</div>
+                        <div class="stat-label">Threat Level</div>
+                    </div>
+                </div>
+
+                <div class="analytics-grid">
+                    <div class="chart-container">
+                        <h3 class="chart-title">🎯 Attack Types Distribution</h3>
+                        <canvas id="attackTypesChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="chart-title">⚠️ Threat Levels</h3>
+                        <canvas id="threatChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="analytics-grid">
+                    <div class="chart-container">
+                        <h3 class="chart-title">🕐 Hourly Attack Pattern</h3>
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="chart-title">🌐 Top Attacking IPs</h3>
+                        <canvas id="topIPsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3 class="chart-title">🚨 Live Attack Feed</h3>
+                    <div class="live-feed" id="liveFeed">Loading...</div>
+                </div>
+
+                <div class="action-buttons">
+                    <button onclick="refreshData()" class="action-btn">🔄 Refresh</button>
+                    <button onclick="exportData()" class="action-btn">📊 Export</button>
+                    <a href="${ADMIN_PATH}/dashboard" class="action-btn">🛡️ Dashboard</a>
+                    <a href="${ADMIN_PATH}/threat-intel" class="action-btn">🌐 Intel</a>
+                </div>
+            </div>
+
+            <script>
+                let charts = {};
+                
+                async function loadAnalytics() {
+                    try {
+                        const response = await fetch('${ADMIN_PATH}/api/analytics-data');
+                        const data = await response.json();
+                        
+                        document.getElementById('totalAttacks').textContent = data.totalAttacks;
+                        document.getElementById('uniqueIPs').textContent = data.uniqueIPs;
+                        document.getElementById('criticalThreats').textContent = data.threatLevels.critical || 0;
+                        
+                        const maxThreat = Object.keys(data.threatLevels).reduce((a, b) => 
+                            data.threatLevels[a] > data.threatLevels[b] ? a : b, 'low');
+                        document.getElementById('currentThreat').textContent = maxThreat?.toUpperCase() || 'LOW';
+                        
+                        updateCharts(data);
+                        updateLiveFeed(data.recentAttacks);
+                        
+                    } catch (error) {
+                        console.error('Failed to load analytics:', error);
+                    }
+                }
+                
+                function updateCharts(data) {
+                    const attackCtx = document.getElementById('attackTypesChart').getContext('2d');
+                    if (charts.attackTypes) charts.attackTypes.destroy();
+                    charts.attackTypes = new Chart(attackCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: Object.keys(data.attackTypes),
+                            datasets: [{
+                                data: Object.values(data.attackTypes),
+                                backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#3b82f6', '#10b981']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { labels: { color: '#cbd5e1' } } }
+                        }
+                    });
+                    
+                    const threatCtx = document.getElementById('threatChart').getContext('2d');
+                    if (charts.threat) charts.threat.destroy();
+                    charts.threat = new Chart(threatCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(data.threatLevels),
+                            datasets: [{
+                                data: Object.values(data.threatLevels),
+                                backgroundColor: ['#dc2626', '#ea580c', '#eab308', '#059669']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+                                y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } }
+                            }
+                        }
+                    });
+                    
+                    const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+                    if (charts.hourly) charts.hourly.destroy();
+                    const hourlyLabels = Array.from({length: 24}, (_, i) => i + ':00');
+                    const hourlyData = hourlyLabels.map((_, i) => data.hourlyData[i] || 0);
+                    
+                    charts.hourly = new Chart(hourlyCtx, {
+                        type: 'line',
+                        data: {
+                            labels: hourlyLabels,
+                            datasets: [{
+                                label: 'Attacks',
+                                data: hourlyData,
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                            scales: {
+                                x: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+                                y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } }
+                            }
+                        }
+                    });
+                    
+                    const ipCtx = document.getElementById('topIPsChart').getContext('2d');
+                    if (charts.topIPs) charts.topIPs.destroy();
+                    const topIPs = Object.entries(data.topIPs)
+                        .sort(([,a], [,b]) => b - a)
+                        .slice(0, 5);
+                    
+                    charts.topIPs = new Chart(ipCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: topIPs.map(([ip]) => ip),
+                            datasets: [{
+                                label: 'Attacks',
+                                data: topIPs.map(([,count]) => count),
+                                backgroundColor: '#3b82f6'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            indexAxis: 'y',
+                            plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                            scales: {
+                                x: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+                                y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } }
+                            }
+                        }
+                    });
+                }
+                
+                function updateLiveFeed(attacks) {
+                    const feed = document.getElementById('liveFeed');
+                    feed.innerHTML = attacks.map(attack => \`
+                        <div class="attack-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span class="attack-ip">\${attack.ip}</span> - \${attack.attack_type}
+                                    <div style="color: #64748b; font-size: 0.75rem;">\${new Date(attack.timestamp).toLocaleString()}</div>
+                                </div>
+                                <span class="threat-badge threat-\${attack.threat_level}">\${attack.threat_level.toUpperCase()}</span>
+                            </div>
+                        </div>
+                    \`).join('');
+                }
+                
+                function refreshData() {
+                    loadAnalytics();
+                }
+                
+                function exportData() {
+                    window.open('${ADMIN_PATH}/api/analytics-data', '_blank');
+                }
+                
+                loadAnalytics();
+                setInterval(loadAnalytics, 30000);
+            </script>
+        </body>
+        </html>
+    `;
+}
+
 app.listen(PORT, () => {
-    console.log(`🚀 ThreatNet Enterprise running on port ${PORT}`);
-    console.log(`🔐 Services: HTTP:${PORT}, SSH:${SSH_PORT}, FTP:${FTP_PORT}`);
+    console.log(`🚀 ThreatNet HTTP Honeypot running on port ${PORT}`);
+    console.log(`🌐 Web Interface: http://localhost:${PORT}`);
+    console.log(`🔐 Admin Console: http://localhost:${PORT}${ADMIN_PATH}`);
 });
