@@ -1,29 +1,37 @@
 {
-  "name": "threatnet",
-  "version": "2.0.0",
-  "description": "Advanced Honeypot Security System with Social Engineering Detection",
-  "main": "secure-server.js",
+  "name": "threatnet-enterprise",
+  "version": "3.0.0",
+  "description": "Enterprise Multi-Service Honeypot with Advanced Threat Intelligence",
+  "main": "enterprise-server.js",
   "scripts": {
-    "start": "node secure-server.js",
-    "dev": "nodemon secure-server.js",
-    "old": "node server.js"
+    "start": "node enterprise-server.js",
+    "dev": "nodemon enterprise-server.js",
+    "secure": "node secure-server.js",
+    "basic": "node server.js"
   },
   "dependencies": {
-    "body-parser": "^1.20.2",
     "express": "^4.18.2",
-    "express-rate-limit": "^6.7.0",
-    "express-session": "^1.18.2",
-    "sqlite3": "^5.1.6"
+    "body-parser": "^1.20.2",
+    "sqlite3": "^5.1.6",
+    "express-session": "^1.17.3",
+    "express-rate-limit": "^6.7.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
   },
   "keywords": [
-    "honeypot",
-    "cybersecurity",
-    "social-engineering",
-    "threat-detection"
+    "honeypot", 
+    "cybersecurity", 
+    "threat-intelligence", 
+    "social-engineering", 
+    "multi-service",
+    "enterprise-security",
+    "intrusion-detection"
   ],
-  "author": "ThreatNet Security",
-  "license": "MIT"
+  "author": "ThreatNet Security Research",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Charu-Porush/threatnet"
+  }
 }
