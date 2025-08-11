@@ -160,6 +160,19 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Block old insecure admin routes
+app.get('/admin', (req, res) => {
+    res.status(404).send('Page not found');
+});
+
+app.get('/analytics.html', (req, res) => {
+    res.status(404).send('Page not found');
+});
+
+app.get('/reset-logs', (req, res) => {
+    res.status(404).send('Page not found');
+});
+
 app.post('/login', loginLimiter, (req, res) => {
     const ip = req.ip || req.connection.remoteAddress;
     const username = req.body.username || '';
@@ -279,6 +292,8 @@ function generateResponse(isSuspicious, type, indicators) {
                     <br><br>
                     <a href="/" style="padding: 0.75rem 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                        color: white; text-decoration: none; border-radius: 0.5rem;">← Try Again</a>
+                    <br><br>
+                    <small style="color: #64748b;">🔒 All activities are monitored and logged</small>
                 </div>
             </div>
         </body></html>
