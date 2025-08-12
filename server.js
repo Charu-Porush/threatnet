@@ -549,7 +549,7 @@ app.get('/admin', requireAuth, (req, res) => {
                     </div>
                     <div class="footer-section">
                         <h4>📊 Security Stats</h4>
-                        <p>• Multi-vector attack detection<br>
+                        <p>• AI-powered attack classification<br>
                         • Real-time threat monitoring<br>
                         • Advanced analytics & reporting</p>
                     </div>
