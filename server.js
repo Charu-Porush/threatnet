@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,6 +10,23 @@ const PORT = process.env.PORT || 3000;
 // Middleware to parse form data
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'))); // to serve frontend files
+
+// Session configuration
+app.use(session({
+    secret: 'honeypot-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+}));
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+    if (req.session.authenticated) {
+        next();
+    } else {
+        res.redirect('/dashboard-login');
+    }
+}
 
 // Setup SQLite database (in-memory for Vercel)
 const db = new sqlite3.Database(':memory:', (err) => {
@@ -28,6 +46,49 @@ const db = new sqlite3.Database(':memory:', (err) => {
 // Serve your homepage (we will create this later)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Dashboard login page
+app.get('/dashboard-login', (req, res) => {
+    const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Dashboard Login - ThreatNet</title>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+    <body>
+        <div style="max-width: 400px; margin: 8rem auto; padding: 0 1rem;">
+            <div style="background: rgba(30, 41, 59, 0.8); border: 1px solid #64748b; border-radius: 1rem; padding: 3rem;">
+                <h2 style="text-align: center; color: #f1f5f9; margin-bottom: 2rem;">🛡️ Dashboard Access</h2>
+                <form method="POST" action="/dashboard-login">
+                    <div style="margin-bottom: 1rem;">
+                        <input type="password" name="password" placeholder="Admin Password" required 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #64748b; border-radius: 0.5rem; background: rgba(15, 23, 42, 0.8); color: #f1f5f9;">
+                    </div>
+                    <button type="submit" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; border: none; border-radius: 0.5rem; cursor: pointer;">Access Dashboard</button>
+                </form>
+                <div style="text-align: center; margin-top: 1rem;">
+                    <a href="/" style="color: #94a3b8; text-decoration: none;">← Back to Home</a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>`;
+    res.send(html);
+});
+
+// Dashboard login handler
+app.post('/dashboard-login', (req, res) => {
+    const password = req.body.password;
+    if (password === 'admin123') { // Change this password
+        req.session.authenticated = true;
+        res.redirect('/admin');
+    } else {
+        res.redirect('/dashboard-login?error=1');
+    }
 });
 
 function isSuspicious(input) {
@@ -271,8 +332,8 @@ app.get('/login-result', (req, res) => {
     res.send(responseHtml);
 });
 
-// Admin dashboard route to show logs
-app.get('/admin', (req, res) => {
+// Admin dashboard route to show logs (protected)
+app.get('/admin', requireAuth, (req, res) => {
     db.all('SELECT * FROM logs ORDER BY timestamp DESC', [], (err, rows) => {
         if (err) {
             return res.status(500).send('Database error');
@@ -338,6 +399,7 @@ app.get('/admin', (req, res) => {
                 <a href="/analytics.html" class="action-btn">📈 Analytics</a>
                 <a href="#" class="action-btn" onclick="window.location.reload()">🔄 Refresh</a>
                 <a href="/reset-logs" class="action-btn" onclick="return confirm('Are you sure you want to clear all logs?')">🗑️ Clear Logs</a>
+                <a href="/logout" class="action-btn">🚪 Logout</a>
               </div>
 
               <div class="table-container">
@@ -410,6 +472,15 @@ app.get('/admin', (req, res) => {
     });
 });
 
+// Logout route
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
+});
 
+// Protect analytics route
+app.get('/analytics.html', requireAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'analytics.html'));
+});
 
 
