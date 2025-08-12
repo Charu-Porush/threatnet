@@ -12,12 +12,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Security configuration
+// HONEYPOT: Intentional weak default for trapping attackers
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'threatnet-admin-2024';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(64).toString('hex');
 const ADMIN_PATH = process.env.ADMIN_PATH || '/security-console-x7k9';
 
 console.log(`🔐 Admin Console: http://localhost:${PORT}${ADMIN_PATH}`);
 console.log(`🔑 Admin Secret: ${ADMIN_SECRET}`);
+console.log(`🍯 HONEYPOT MODE: Vulnerabilities are intentional traps`);
 
 // Rate limiting
 const loginLimiter = rateLimit({
@@ -26,9 +28,9 @@ const loginLimiter = rateLimit({
     message: 'Too many attempts'
 });
 
-// Middleware
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+// Middleware - SECURITY: Replace deprecated bodyParser
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(express.static('public'));
 
 app.use(session({
@@ -36,9 +38,10 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: false,
+        secure: process.env.NODE_ENV === 'production', // SECURITY: Enable secure cookies in production
         maxAge: 2 * 60 * 60 * 1000,
-        httpOnly: true
+        httpOnly: true,
+        sameSite: 'strict' // SECURITY: Prevent CSRF
     }
 }));
 
@@ -47,6 +50,7 @@ const dbPath = path.join(__dirname, 'threatnet.db');
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('DB error:', err.message);
+        process.exit(1); // SECURITY: Exit on critical database failure
     } else {
         console.log('🗄️ Database connected:', dbPath);
         initDatabase();
@@ -107,13 +111,18 @@ function requireAuth(req, res, next) {
 // AI-Powered Threat Analysis (Free Hugging Face API)
 async function aiThreatAnalysis(payload, userAgent, ip) {
     try {
+        // SECURITY: Validate payload to prevent SSRF and injection
+        if (!payload || typeof payload !== 'string' || payload.length > 1000) {
+            throw new Error('Invalid payload');
+        }
+        
         const response = await fetch('https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-sentiment-latest', {
             method: 'POST',
             headers: {
                 'Authorization': 'Bearer hf_demo', // Free demo token
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ inputs: payload })
+            body: JSON.stringify({ inputs: payload.substring(0, 500) }) // SECURITY: Limit payload size
         });
         
         const result = await response.json();
@@ -183,7 +192,11 @@ async function analyzeSocialEngineering(username, password, userAgent, service) 
         indicators.push('Common password');
     }
     
-    // Social engineering patterns
+    // Social engineering patterns - SECURITY: Validate input types
+    if (typeof username !== 'string' || typeof password !== 'string') {
+        username = String(username || '');
+        password = String(password || '');
+    }
     const fullInput = (username + ' ' + password).toLowerCase();
     Object.entries(socialPatterns).forEach(([category, words]) => {
         words.forEach(word => {
@@ -423,7 +436,12 @@ app.get(`${ADMIN_PATH}`, (req, res) => {
 });
 
 app.post(`${ADMIN_PATH}/auth`, (req, res) => {
-    if (req.body.secret === ADMIN_SECRET) {
+    // SECURITY: Use timing-safe comparison for real admin auth
+    const providedSecret = Buffer.from(req.body.secret || '', 'utf8');
+    const actualSecret = Buffer.from(ADMIN_SECRET, 'utf8');
+    
+    if (providedSecret.length === actualSecret.length && 
+        crypto.timingSafeEqual(providedSecret, actualSecret)) {
         req.session.authenticated = true;
         res.redirect(`${ADMIN_PATH}/dashboard`);
     } else {

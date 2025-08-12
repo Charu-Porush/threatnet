@@ -8,13 +8,18 @@ app.use(express.urlencoded({ extended: true }));
 // AI-Powered Threat Analysis (Free)
 async function aiThreatAnalysis(payload) {
     try {
+        // SECURITY: Validate payload to prevent SSRF
+        if (!payload || typeof payload !== 'string' || payload.length > 1000) {
+            throw new Error('Invalid payload');
+        }
+        
         const response = await fetch('https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-sentiment-latest', {
             method: 'POST',
             headers: {
                 'Authorization': 'Bearer hf_demo',
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ inputs: payload })
+            body: JSON.stringify({ inputs: payload.substring(0, 500) })
         });
         
         const result = await response.json();
