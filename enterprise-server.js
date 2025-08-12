@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+require('dotenv').config();
 
 
 const app = express();
@@ -108,7 +109,7 @@ function requireAuth(req, res, next) {
     res.status(401).send('Unauthorized Access');
 }
 
-// AI-Powered Threat Analysis (Free Hugging Face API)
+// AI-Powered Threat Analysis (OpenRouter API)
 async function aiThreatAnalysis(payload, userAgent, ip) {
     try {
         // SECURITY: Validate payload to prevent SSRF and injection
@@ -116,34 +117,39 @@ async function aiThreatAnalysis(payload, userAgent, ip) {
             throw new Error('Invalid payload');
         }
         
-        const response = await fetch('https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-sentiment-latest', {
+        const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+        
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': 'Bearer hf_demo', // Free demo token
-                'Content-Type': 'application/json'
+                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'http://localhost:3000',
+                'X-Title': 'ThreatNet Honeypot'
             },
-            body: JSON.stringify({ inputs: payload.substring(0, 500) }) // SECURITY: Limit payload size
+            body: JSON.stringify({
+                model: 'meta-llama/llama-3.2-3b-instruct:free',
+                messages: [{
+                    role: 'system',
+                    content: 'You are a cybersecurity AI analyzing attack payloads. Respond with JSON only: {"threat_level": "low/medium/high/critical", "attack_type": "sql_injection/xss/command_injection/brute_force/reconnaissance", "confidence": 0-100, "malicious": true/false, "indicators": ["list of threat indicators"]}'
+                }, {
+                    role: 'user',
+                    content: `Analyze this potential attack payload: "${payload.substring(0, 500)}"`
+                }],
+                max_tokens: 200,
+                temperature: 0.1
+            })
         });
         
         const result = await response.json();
-        const sentiment = result[0]?.label || 'NEUTRAL';
-        const confidence = result[0]?.score || 0.5;
-        
-        // Convert sentiment to threat analysis
-        let aiThreatLevel = 'medium';
-        let aiConfidence = confidence;
-        
-        if (sentiment === 'NEGATIVE' && confidence > 0.7) {
-            aiThreatLevel = 'high';
-        } else if (sentiment === 'POSITIVE') {
-            aiThreatLevel = 'low';
-        }
+        const aiResponse = JSON.parse(result.choices[0]?.message?.content || '{}');
         
         return {
-            ai_analysis: sentiment,
-            ai_confidence: Math.round(confidence * 100),
-            ai_threat_level: aiThreatLevel,
-            ai_indicators: [`AI detected ${sentiment.toLowerCase()} intent`]
+            ai_analysis: aiResponse.malicious ? 'MALICIOUS' : 'BENIGN',
+            ai_confidence: aiResponse.confidence || 75,
+            ai_threat_level: aiResponse.threat_level || 'medium',
+            ai_indicators: aiResponse.indicators || ['AI threat analysis'],
+            attack_type: aiResponse.attack_type || 'unknown'
         };
     } catch (error) {
         // Fallback AI simulation

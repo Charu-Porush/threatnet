@@ -14,7 +14,8 @@
     "body-parser": "^1.20.2",
     "sqlite3": "^5.1.6",
     "express-session": "^1.17.3",
-    "express-rate-limit": "^6.7.0"
+    "express-rate-limit": "^6.7.0",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
