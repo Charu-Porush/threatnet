@@ -91,6 +91,46 @@ app.post('/dashboard-login', (req, res) => {
     }
 });
 
+// Bot vs Human Detection
+function detectBotOrHuman(userAgent, payload) {
+    let botScore = 0;
+    let indicators = [];
+    
+    // User Agent Analysis
+    const botPatterns = ['bot', 'crawler', 'spider', 'curl', 'wget', 'python', 'scanner', 'sqlmap', 'nmap', 'burp'];
+    const humanBrowsers = ['chrome', 'firefox', 'safari', 'edge', 'opera'];
+    
+    if (userAgent) {
+        const ua = userAgent.toLowerCase();
+        
+        botPatterns.forEach(pattern => {
+            if (ua.includes(pattern)) {
+                botScore += 3;
+                indicators.push(`Bot pattern: ${pattern}`);
+            }
+        });
+        
+        if (humanBrowsers.some(browser => ua.includes(browser))) {
+            botScore -= 2;
+            indicators.push('Human browser');
+        }
+    } else {
+        botScore += 4;
+        indicators.push('No user agent');
+    }
+    
+    // Payload Analysis
+    if (payload && /union.*select|<script|1'.*or.*'1/i.test(payload)) {
+        botScore += 2;
+        indicators.push('Automated attack');
+    }
+    
+    const classification = botScore >= 5 ? 'BOT' : botScore <= -1 ? 'HUMAN' : 'SUSPICIOUS';
+    const confidence = Math.min(0.95, 0.6 + Math.abs(botScore) * 0.05);
+    
+    return { classification, confidence, indicators };
+}
+
 function isSuspicious(input) {
     const suspiciousPatterns = [
         /(\bor\b|\band\b).*=.*--/i,           // SQL Injection keyword patterns
@@ -108,8 +148,11 @@ app.post('/login', (req, res) => {
     const ip = req.ip;
     const username = req.body.username;
     const password = req.body.password;
+    const userAgent = req.get('User-Agent') || 'Unknown';
+    const payload = `username=${username} password=${password}`;
 
     let alert = '';
+    const botAnalysis = detectBotOrHuman(userAgent, payload);
 
     if (isSuspicious(username) || isSuspicious(password)) {
         alert = '[!] Suspicious input detected!';
@@ -202,10 +245,16 @@ app.post('/login', (req, res) => {
             <div class="result-card">
                 <div class="result-icon">${isAttack ? '🚨' : '❌'}</div>
                 <h2 class="result-title">${isAttack ? 'Security Alert' : 'Authentication Failed'}</h2>
+                <div style="background: rgba(15, 23, 42, 0.8); border-radius: 0.5rem; padding: 1.5rem; margin: 1.5rem 0; text-align: left;">
+                    <h4 style="color: #3b82f6; margin-bottom: 1rem;">🔍 Analysis Results</h4>
+                    <p><strong>Attacker Type:</strong> ${botAnalysis.classification}</p>
+                    <p><strong>Confidence:</strong> ${Math.round(botAnalysis.confidence * 100)}%</p>
+                    <p><strong>Indicators:</strong> ${botAnalysis.indicators.slice(0, 2).join(', ')}</p>
+                </div>
                 <p class="result-message">
                     ${isAttack ? 
-                        'Suspicious activity detected in your login attempt. This incident has been logged for security analysis.' : 
-                        'Invalid credentials provided. Please verify your username and password and try again.'}
+                        'Suspicious activity detected and logged for analysis.' : 
+                        'Invalid credentials provided. Please try again.'}
                 </p>
                 <a href="/" class="back-button">← Try Again</a>
             </div>
