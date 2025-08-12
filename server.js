@@ -43,22 +43,14 @@ const db = new sqlite3.Database(':memory:', (err) => {
     }
 });
 
-// Serve your homepage with AI indicator
+// Serve realistic corporate login (honeypot)
 app.get('/', (req, res) => {
-    const fs = require('fs');
-    let html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
-    
-    // Add AI status indicator
-    const aiIndicator = `
-        <div style="position: fixed; top: 20px; right: 20px; background: rgba(59, 130, 246, 0.9); color: white; padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 1000; backdrop-filter: blur(10px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-            🤖 AI Security: <span style="color: #10b981; font-weight: bold;">ACTIVE</span>
-        </div>
-    `;
-    
-    // Inject before closing body tag
-    html = html.replace('</body>', aiIndicator + '</body>');
-    
-    res.send(html);
+    res.sendFile(path.join(__dirname, 'public', 'corporate-login.html'));
+});
+
+// Demo page with AI features (for recruiters)
+app.get('/demo', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Dashboard login page

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Portal - GlobalTech Solutions</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏢</text></svg>">
+</head>
+<body>
+  <header class="security-header">
+    <div class="header-content">
+      <a href="/" class="logo">GlobalTech</a>
+      <nav class="nav-menu">
+        <ul class="nav-links">
+          <li><a href="/" class="active">🏠 Home</a></li>
+          <li><a href="/admin">💼 Admin Panel</a></li>
+          <li><a href="/files">📁 File Server</a></li>
+        </ul>
+        <div class="status-indicator">
+          <div class="status-dot"></div>
+          Online
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="security-card">
+      <div class="card-header">
+        <h1 class="card-title">Employee Login Portal</h1>
+        <p class="card-subtitle">Access your company resources and dashboard</p>
+      </div>
+      
+      <form action="/login" method="POST">
+        <div class="form-group">
+          <label class="form-label" for="username">Employee ID</label>
+          <input 
+            type="text" 
+            id="username"
+            name="username" 
+            class="form-input"
+            placeholder="Enter your employee ID"
+            required
+            autocomplete="username"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input 
+            type="password" 
+            id="password"
+            name="password" 
+            class="form-input"
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+          >
+        </div>
+        
+        <button type="submit" class="security-button">
+          Sign In
+        </button>
+      </form>
+      
+      <div style="margin-top: 2rem; text-align: center; color: var(--text-muted); font-size: 0.75rem;">
+        <p>🔒 Secure employee access portal</p>
+        <p style="margin-top: 0.5rem;"><a href="#" style="color: #3b82f6;">Forgot password?</a> | <a href="#" style="color: #3b82f6;">IT Support</a></p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="security-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h4>🏢 GlobalTech Solutions</h4>
+        <p>Leading enterprise technology solutions provider. Serving Fortune 500 companies worldwide with innovative software and IT consulting services.</p>
+      </div>
+      <div class="footer-section">
+        <h4>🔗 Employee Resources</h4>
+        <ul class="footer-links">
+          <li><a href="/">🏠 Portal Home</a></li>
+          <li><a href="/admin">💼 Admin Panel</a></li>
+          <li><a href="/files">📁 Document Server</a></li>
+          <li><a href="/hr">👥 HR System</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h4>📊 Company Services</h4>
+        <p>• Enterprise software development<br>
+        • Cloud infrastructure solutions<br>
+        • IT consulting and support<br>
+        • Digital transformation services</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2024 GlobalTech Solutions Inc. All rights reserved. | <a href="#" style="color: #3b82f6;">Privacy Policy</a> | <a href="#" style="color: #3b82f6;">Terms of Service</a></p>
+    </div>
+  </footer>
+</body>
+</html>
