@@ -198,6 +198,79 @@ app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });
 
+// Security console login endpoint
+app.get('/security-console-x7k9/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.post('/security-console-x7k9/login', (req, res) => {
+    const ip = req.ip;
+    const username = req.body.username;
+    const password = req.body.password;
+
+    let alert = '';
+
+    if (isSuspicious(username) || isSuspicious(password)) {
+        alert = '[!] Suspicious input detected!';
+    }
+
+    // Log every attempt
+    const stmt = db.prepare('INSERT INTO logs (ip, payload) VALUES (?, ?)');
+    stmt.run(ip, `security-console: username=${username} password=${password}`, (err) => {
+        if (err) {
+            console.error(err.message);
+        }
+    });
+    stmt.finalize();
+
+    // Redirect to main login result
+    res.redirect('/login-result?status=' + (alert ? 'threat' : 'failed'));
+});
+
+// Login result endpoint
+app.get('/login-result', (req, res) => {
+    const status = req.query.status;
+    const isAttack = status === 'threat';
+    
+    const responseHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Security Console - Authentication Result</title>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+    <body>
+        <header class="security-header">
+            <div class="header-content">
+                <a href="/" class="logo">ThreatNet</a>
+                <nav class="nav-menu">
+                    <ul class="nav-links">
+                        <li><a href="/">🏠 Home</a></li>
+                        <li><a href="/admin">🛡️ Dashboard</a></li>
+                        <li><a href="/analytics.html">📊 Analytics</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </header>
+        <div style="max-width: 500px; margin: 8rem auto; padding: 0 1rem;">
+            <div style="background: rgba(30, 41, 59, 0.8); border: 1px solid ${isAttack ? '#ef4444' : '#64748b'}; border-radius: 1rem; padding: 3rem; text-align: center;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">${isAttack ? '🚨' : '❌'}</div>
+                <h2 style="color: ${isAttack ? '#ef4444' : '#f1f5f9'}; margin-bottom: 1rem;">${isAttack ? 'Security Alert' : 'Access Denied'}</h2>
+                <p style="color: #94a3b8; margin-bottom: 2rem;">
+                    ${isAttack ? 'Suspicious activity detected. Incident logged.' : 'Invalid credentials. Access denied.'}
+                </p>
+                <a href="/" style="display: inline-block; padding: 0.75rem 2rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; text-decoration: none; border-radius: 0.5rem;">← Return Home</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+    
+    res.send(responseHtml);
+});
+
 // Admin dashboard route to show logs
 app.get('/admin', (req, res) => {
     db.all('SELECT * FROM logs ORDER BY timestamp DESC', [], (err, rows) => {

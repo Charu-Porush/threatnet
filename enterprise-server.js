@@ -261,6 +261,10 @@ app.get(`${ADMIN_PATH}/login`, (req, res) => {
     res.send(generateAdminLogin());
 });
 
+app.get(`${ADMIN_PATH}`, (req, res) => {
+    res.redirect(`${ADMIN_PATH}/login`);
+});
+
 app.post(`${ADMIN_PATH}/auth`, (req, res) => {
     if (req.body.secret === ADMIN_SECRET) {
         req.session.authenticated = true;
