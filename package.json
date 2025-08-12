@@ -2,13 +2,12 @@
   "name": "threatnet-enterprise",
   "version": "3.0.0",
   "description": "Enterprise Multi-Service Honeypot with Advanced Threat Intelligence",
-  "main": "enterprise-honeypot.js",
+  "main": "enterprise-server.js",
   "scripts": {
-    "start": "node enterprise-honeypot.js",
-    "dev": "nodemon enterprise-honeypot.js",
-    "complete": "node complete-server.js",
-    "basic": "node server.js",
-    "setup": "node setup.js"
+    "start": "node enterprise-server.js",
+    "dev": "nodemon enterprise-server.js",
+    "secure": "node secure-server.js",
+    "basic": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",

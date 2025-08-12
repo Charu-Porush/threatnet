@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "enterprise-honeypot.js",
+      "src": "server.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/enterprise-honeypot.js"
+      "dest": "/server.js"
     }
   ]
 }
