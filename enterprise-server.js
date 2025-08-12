@@ -307,9 +307,23 @@ async function logAttack(service, ip, payload, userAgent, analysis) {
     console.log(`🚨 ${analysis.threatLevel.toUpperCase()} threat from ${ip} (${intel.country}) on ${service}${aiInfo}`);
 }
 
-// HTTP Honeypot (existing)
+// HTTP Honeypot with AI indicator
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    // Read the original index.html and inject AI status
+    const fs = require('fs');
+    let html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+    
+    // Add AI status indicator
+    const aiIndicator = `
+        <div style="position: fixed; top: 20px; right: 20px; background: rgba(59, 130, 246, 0.9); color: white; padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 1000; backdrop-filter: blur(10px);">
+            🤖 AI-Powered Security: <span style="color: #10b981; font-weight: bold;">ACTIVE</span>
+        </div>
+    `;
+    
+    // Inject before closing body tag
+    html = html.replace('</body>', aiIndicator + '</body>');
+    
+    res.send(html);
 });
 
 app.post('/login', loginLimiter, async (req, res) => {
@@ -318,10 +332,83 @@ app.post('/login', loginLimiter, async (req, res) => {
     const password = req.body.password || '';
     const userAgent = req.get('User-Agent') || '';
     
-    const analysis = analyzeSocialEngineering(username, password, userAgent, 'http');
+    const analysis = await analyzeSocialEngineering(username, password, userAgent, 'http');
     await logAttack('http', ip, `username=${username} password=${password}`, userAgent, analysis);
     
-    res.send(generateResponse(analysis));
+    // Generate AI-enhanced response
+    const aiData = analysis.aiAnalysis || {};
+    const responseHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ThreatNet - AI Analysis Result</title>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+    <body>
+        <div style="max-width: 600px; margin: 6rem auto; padding: 0 1rem;">
+            <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid #3b82f6; border-radius: 1rem; padding: 3rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">🤖</div>
+                    <h1 style="color: #3b82f6; margin-bottom: 0.5rem;">AI-Powered Threat Analysis</h1>
+                    <p style="color: #94a3b8;">Advanced machine learning threat detection</p>
+                </div>
+                
+                <div style="background: rgba(15, 23, 42, 0.8); border-radius: 0.5rem; padding: 2rem; margin: 2rem 0;">
+                    <h3 style="color: #3b82f6; margin-bottom: 1rem;">🔍 AI Analysis Results</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div>
+                            <strong style="color: #f1f5f9;">AI Classification:</strong><br>
+                            <span style="color: ${aiData.ai_analysis === 'MALICIOUS' ? '#ef4444' : aiData.ai_analysis === 'NEGATIVE' ? '#f59e0b' : '#10b981'}; font-weight: bold;">
+                                ${aiData.ai_analysis || 'ANALYZING'}
+                            </span>
+                        </div>
+                        <div>
+                            <strong style="color: #f1f5f9;">AI Confidence:</strong><br>
+                            <span style="color: #3b82f6; font-weight: bold;">${aiData.ai_confidence || 0}%</span>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <strong style="color: #f1f5f9;">Threat Level:</strong>
+                        <span style="padding: 0.25rem 0.75rem; border-radius: 0.5rem; font-weight: bold; margin-left: 0.5rem; background: ${
+                            analysis.threatLevel === 'critical' ? '#dc2626' :
+                            analysis.threatLevel === 'high' ? '#ea580c' :
+                            analysis.threatLevel === 'medium' ? '#eab308' : '#059669'
+                        }; color: white;">
+                            ${analysis.threatLevel.toUpperCase()}
+                        </span>
+                    </div>
+                    <div>
+                        <strong style="color: #f1f5f9;">Attack Type:</strong>
+                        <span style="color: #94a3b8;">${analysis.attackType}</span>
+                    </div>
+                </div>
+                
+                <div style="background: rgba(15, 23, 42, 0.8); border-radius: 0.5rem; padding: 2rem; margin: 2rem 0;">
+                    <h3 style="color: #f59e0b; margin-bottom: 1rem;">⚠️ Security Alert</h3>
+                    <p style="color: #94a3b8; margin-bottom: 1rem;">
+                        ${analysis.threatLevel === 'critical' ? 'Critical threat detected! Advanced persistent threat patterns identified.' :
+                          analysis.threatLevel === 'high' ? 'High-risk activity detected. Potential social engineering attempt.' :
+                          analysis.threatLevel === 'medium' ? 'Suspicious activity logged for analysis.' :
+                          'Low-risk automated attempt detected.'}
+                    </p>
+                    <p style="color: #64748b; font-size: 0.875rem;">
+                        🔒 This incident has been logged and analyzed by our AI security system.
+                    </p>
+                </div>
+                
+                <div style="text-align: center;">
+                    <a href="/" style="display: inline-block; padding: 1rem 2rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; text-decoration: none; border-radius: 0.5rem; font-weight: 600;">
+                        ← Return to System
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>`;
+    
+    res.send(responseHtml);
 });
 
 
@@ -500,8 +587,12 @@ function generateEnterpriseDashboard(logs, stats) {
         <body>
             <div class="admin-container">
                 <div class="dashboard-header">
-                    <h1>🛡️ ThreatNet Enterprise Console</h1>
-                    <p>Multi-Service Honeypot & Threat Intelligence Platform</p>
+                    <h1>🤖 ThreatNet AI-Enhanced Console</h1>
+                    <p>AI-Powered Multi-Service Honeypot & Threat Intelligence Platform</p>
+                    <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; border-radius: 0.5rem; padding: 1rem; margin: 1rem 0;">
+                        <span style="color: #3b82f6; font-weight: bold;">✨ AI Status:</span> 
+                        <span style="color: #10b981;">Machine Learning Threat Analysis ACTIVE</span>
+                    </div>
                 </div>
                 
                 <div class="stats-grid">
@@ -525,12 +616,12 @@ function generateEnterpriseDashboard(logs, stats) {
                 
                 <div class="table-container">
                     <div class="table-header">
-                        <h3>🎯 Live Threat Feed</h3>
-                        <p>Real-time multi-service attack monitoring</p>
+                        <h3>🎯 AI-Enhanced Threat Feed</h3>
+                        <p>Real-time AI-powered attack analysis and monitoring</p>
                     </div>
                     <table>
                         <thead>
-                            <tr><th>Service</th><th>IP</th><th>Location</th><th>Threat Level</th><th>SE Score</th><th>Attack Type</th><th>Time</th></tr>
+                            <tr><th>Service</th><th>IP</th><th>Location</th><th>Threat Level</th><th>AI Analysis</th><th>Attack Type</th><th>Time</th></tr>
                         </thead>
                         <tbody>
                             ${logs.slice(0, 50).map(log => `
@@ -558,7 +649,10 @@ function generateEnterpriseDashboard(logs, stats) {
                                             ${log.threat_level.toUpperCase()}
                                         </span>
                                     </td>
-                                    <td><strong>${log.social_engineering_score}/10</strong></td>
+                                    <td>
+                                        <strong>${log.social_engineering_score}/10</strong>
+                                        ${log.ai_analysis ? `<br><small style="color: #3b82f6;">🤖 AI: ${log.ai_analysis} (${log.ai_confidence}%)</small>` : ''}
+                                    </td>
                                     <td>${log.attack_type}</td>
                                     <td>${new Date(log.timestamp).toLocaleString()}</td>
                                 </tr>
